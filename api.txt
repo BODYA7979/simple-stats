@@ -1,0 +1,40 @@
+GET: /stats/get/{entity_type}/{entity_id}
+
+Show data count for given parameters
+
+JSON RESPONSE:
+if record found
+{
+	"status": "OK",
+	"count": "15645"
+}
+Else if notthing to show:
+{
+	"status": "FAIL",
+	"code": "0",
+	"message": "No records found!"
+}
+
+---------------------------------------
+
+Write one stats record for given parameters
+
+GET: /stats/write/{entity_type}/{entity_id}
+
+JSON Response:
+{
+	"status": "OK"
+}
+
+---------------------------------------
+
+Write one stats record and return current stats by and for given parameters
+
+POST: /stats/trigger/{entity_type}/{entity_id}
+
+JSON RESPONSE
+
+{
+	"status": "OK",
+	"count": "4156"
+}
