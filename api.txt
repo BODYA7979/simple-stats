@@ -38,3 +38,14 @@ JSON RESPONSE
 	"status": "OK",
 	"count": "4156"
 }
+
+
+---------------------------------------
+
+// TODO: implement top ratings
+Get top
+1) By time period
+GET: /stats/get/top/?from={timestamp1}&to={timestamp2}&entity_type={some_entity_type}
+
+2) Most popular by all time
+GET: /stats/get/top/all-time/{entity_type}
