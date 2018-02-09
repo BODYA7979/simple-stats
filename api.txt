@@ -45,7 +45,17 @@ JSON RESPONSE
 // TODO: implement top ratings
 Get top
 1) By time period
-GET: /stats/get/top/?from={timestamp1}&to={timestamp2}&entity_type={some_entity_type}
+GET: /stats/get/top/{entity_type}/{timestamp_from}/{timestamp_to}
+QUERY PARAMETERS:
+limit={number of records} - not required
 
 2) Most popular by all time
 GET: /stats/get/top/all-time/{entity_type}
+
+JSON RESPONSE:
+{
+    [
+        'entity_id': '{some_id}',
+        'count': '{entity_id_count}',
+    ]
+}

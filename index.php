@@ -37,6 +37,40 @@ if (!empty($path_parts)) {
           $response['count'] = $result['count'];
         }
       }
+      // /stats/get/top/{entity_type}/{timestamp_from}/{timestamp_to} [?limit={limit}]
+      elseif ($path_parts[2] == 'top' && !empty($path_parts[3]) && !empty($path_parts[4]) && !empty($path_parts[5])) {
+        $entity_type = $path_parts[3];
+        $from = $path_parts[4];
+        $to = $path_parts[5];
+        $limit = (isset($_GET['limit'])) ? intval($_GET['limit']) : FALSE;
+        $redis_key_name = 'stats:top:'.$entity_type.':'.$from.':'.$to.':limit-'.$limit;
+        if ($redis->exists($redis_key_name)) {
+          $results = @unserialize($redis->get($redis_key_name));
+        }
+        else {
+          $sql = 'select `entity_id`, count(*) as `cnt`
+                                             from `stats`
+                                             WHERE `entity_type` = \''.$entity_type.'\' AND `timestamp` >= '.$from.' AND timestamp <= '.$to.'
+                                             group by `entity_id`
+                                             order by `cnt` desc';
+          if ($limit) {
+            $sql .= ' LIMIT '.$limit;
+          };
+          $query = $database->query($sql);
+          if ($query) {
+            $query_result = $query->fetchAll();
+            $resuls = [];
+            foreach ($query_result as $item) {
+              $results[] = [
+                'entity_id' => $item['entity_id'],
+                'count' => $item['cnt']
+              ];
+            }
+            $redis->set($redis_key_name, serialize($results), Config::CACHE_LIFETIME['stats']['top-by-timestamp']);
+          }
+        }
+        $response = $results;
+      }
       else {
         // route callback: /stats/get/{entity_type}/{entity_id}
         if (!empty($path_parts[2]) && !empty($path_parts[3])) {
