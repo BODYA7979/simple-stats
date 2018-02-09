@@ -8,6 +8,13 @@ use \Psr\Http\Message\ServerRequestInterface;
 use \React\Http\Response;
 use Medoo\Medoo;
 
+if (Config::DEBUG) {
+  error_reporting(E_ALL);
+}
+else {
+  error_reporting(0);
+}
+
 class Errors {
 
   const STATS_NO_DATA = 0;
@@ -140,6 +147,7 @@ if (empty($table_check)) {
 }
 
 $server = new HttpServer(function (ServerRequestInterface $request) use ($database) {
+  $start_request = microtime(true);
   $redis = get_redis();
   $url_parts = parse_url($request->getUri());
   $path_parts = explode('/', ltrim($url_parts['path'], '/'));
@@ -147,18 +155,51 @@ $server = new HttpServer(function (ServerRequestInterface $request) use ($databa
   if (!empty($path_parts)) {
     if ($path_parts[0] == 'stats') {
       if ($path_parts[1] == 'get') {
-        if (!empty($path_parts[2]) && !empty($path_parts[3])) {
-          // show total view results for selected entity
-          $entity_type = $path_parts[2];
-          $entity_id = $path_parts[3];
-          if ($count = stats_get_count($entity_type, $entity_id)) {
-            $response['status'] = 'OK';
-            $response['count'] = $count;
+        // route callback: /stats/get/top/all-time/{entity_type}
+        if ($path_parts[2] == 'top' && $path_parts[3] == 'all-time' && !empty($path_parts[4])) {
+          $entity_type = $path_parts[4];
+          $redis_key_name = 'stats:top:all-time:'.$entity_type;
+          if ($redis->exists($redis_key_name)) {
+            $result = @unserialize($redis->get($redis_key_name));
           }
           else {
-            $response['status'] = 'FAIL';
-            $response['code'] = Errors::STATS_NO_DATA;
-            $response['message'] = Errors::getMessage(Errors::STATS_NO_DATA);
+            $query = $database->query('select `entity_id`, count(*) as `cnt`
+                                             from `stats`
+                                             WHERE `entity_type` = \''.$entity_type.'\'
+                                             group by `entity_id`
+                                             order by `cnt` desc
+                                             limit 1
+                                     ');
+            if ($query) {
+              $query_result = $query->fetch();
+              $result = [
+                'entity_id' => $query_result['entity_id'],
+                'count' => $query_result['cnt']
+              ];
+              $redis->set($redis_key_name, serialize($result), Config::CACHE_LIFETIME['stats']['top-all-time']);
+            }
+          }
+
+          if (!empty($result)) {
+            $response['entity_id'] = $result['entity_id'];
+            $response['count'] = $result['count'];
+          }
+        }
+        else {
+          // route callback: /stats/get/{entity_type}/{entity_id}
+          if (!empty($path_parts[2]) && !empty($path_parts[3])) {
+            // show total view results for selected entity
+            $entity_type = $path_parts[2];
+            $entity_id = $path_parts[3];
+            if ($count = stats_get_count($entity_type, $entity_id)) {
+              $response['status'] = 'OK';
+              $response['count'] = $count;
+            }
+            else {
+              $response['status'] = 'FAIL';
+              $response['code'] = Errors::STATS_NO_DATA;
+              $response['message'] = Errors::getMessage(Errors::STATS_NO_DATA);
+            }
           }
         }
       }
@@ -184,6 +225,12 @@ $server = new HttpServer(function (ServerRequestInterface $request) use ($databa
       }
     }
   }
+
+  $time_elapsed_secs = microtime(true) - $start_request;
+  if (Config::DEBUG) {
+    echo 'Request "' . $request->getUri() . '" processed in: ' . $time_elapsed_secs . PHP_EOL;
+  }
+
   if (!empty($response)) {
     return new Response(200, ['Content-Type' => 'application/json'], json_encode($response));
   }
@@ -197,4 +244,5 @@ $server = new HttpServer(function (ServerRequestInterface $request) use ($databa
 $loop = React\EventLoop\Factory::create();
 $socket = new SocketServer(Config::PORT, $loop);
 $server->listen($socket);
+echo 'Local server started on http://127.0.0.1:'.Config::PORT.PHP_EOL;
 $loop->run();
