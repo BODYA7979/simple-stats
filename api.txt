@@ -1,4 +1,8 @@
 GET: /stats/get/{entity_type}/{entity_id}
+QUERY PARAMETERS:
+Sort by date: - not required
+from={timestamp_from}
+to={timestamp_to}
 
 Show data count for given parameters
 
@@ -8,7 +12,7 @@ if record found
 	"status": "OK",
 	"count": "15645"
 }
-Else if notthing to show:
+Else if nothing to show:
 {
 	"status": "FAIL",
 	"code": "0",
@@ -42,7 +46,6 @@ JSON RESPONSE
 
 ---------------------------------------
 
-// TODO: implement top ratings
 Get top
 1) By time period
 GET: /stats/get/top/{entity_type}/{timestamp_from}/{timestamp_to}

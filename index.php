@@ -77,7 +77,8 @@ if (!empty($path_parts)) {
           // show total view results for selected entity
           $entity_type = $path_parts[2];
           $entity_id = $path_parts[3];
-          if ($count = stats_get_count($entity_type, $entity_id)) {
+          $data = (!empty($_GET['data']) ? $_GET['data'] : []);
+          if ($count = $stats->get($entity_type, $entity_id, $data)) {
             $response['status'] = 'OK';
             $response['count'] = $count;
           }
@@ -94,7 +95,8 @@ if (!empty($path_parts)) {
         // add plus one count
         $entity_type = $path_parts[2];
         $entity_id = $path_parts[3];
-        stats_write_one($entity_type, $entity_id);
+        $data = (!empty($_GET['data']) ? $_GET['data'] : []);
+        $stats->write($entity_type, $entity_id, $data);
         $response['status'] = 'OK';
       }
     }
@@ -103,10 +105,11 @@ if (!empty($path_parts)) {
         // we need to add plus one to views count and show results
         $entity_type = $path_parts[2];
         $entity_id = $path_parts[3];
-        $count = stats_get_count($entity_type, $entity_id);
-        stats_write_one($entity_type, $entity_id);
+        $data = (!empty($_GET['data']) ? $_GET['data'] : []);
+        $stats->write($entity_type, $entity_id, $data);
+        $count = $stats->get($entity_type, $entity_id, $data);
         $response['status'] = 'OK';
-        $response['count'] = ($count + 1);
+        $response['count'] = $count;
       }
     }
   }

@@ -1,6 +1,7 @@
 <?php
 
 require_once './vendor/autoload.php';
+require_once './Stats.class.php';
 require_once './errors.php';
 require_once './config.php';
 
@@ -57,63 +58,21 @@ function get_redis() {
 
 function create_tables() {
   global $database;
-  $database->query('CREATE TABLE stats
-                          (
-                            entity_type VARCHAR NOT NULL,
-                            entity_id   VARCHAR NOT NULL,
-                            timestamp   INT,
-                            data        BLOB
-                          );
-                          
-                          CREATE INDEX stats_entity_type_entity_id_index
-                            ON stats (entity_type, entity_id);
-                  ')->execute();
+  $database->query('
+CREATE TABLE stats
+(
+    entity_type VARCHAR NOT NULL,
+    entity_id VARCHAR NOT NULL,
+    timestamp INT,
+    data BLOB
+);
+CREATE INDEX stats_entity_type_entity_id_timestamp_index ON stats (entity_type, entity_id DESC, timestamp DESC);
+INSERT INTO stats(entity_type, entity_id, timestamp, data) SELECT entity_type, entity_id, timestamp, data FROM stats;
+DROP TABLE stats;
+ALTER TABLE stats RENAME TO stats;
+')->execute();
 }
 
-/**
- * @param $entity_type string
- * @param $entity_id string
- *
- * @return int|false
- */
-function stats_get_count($entity_type, $entity_id) {
-  global $database;
-  /** @var $redis Redis */
-  global $redis;
-  $redis_record_name = 'stats:'.$entity_type.':'.$entity_id;
-  if (!$redis->exists($redis_record_name)) {
-    if ($count = $database->count('stats', ['entity_type' => $entity_type, 'entity_id' => $entity_id])) {
-      $redis->set($redis_record_name, $count);
-      return $count;
-    }
-    else {
-      return FALSE;
-    }
-  }
-  else {
-    $count = $redis->get($redis_record_name);
-    return $count;
-  }
-}
-
-/**
- * @param $entity_type
- * @param $entity_id
- */
-function stats_write_one($entity_type, $entity_id) {
-  global $database;
-  /** @var $redis Redis */
-  global $redis;
-  $redis_record_name = 'stats:'.$entity_type.':'.$entity_id;
-  $database->insert('stats', [
-    'entity_type' => $entity_type,
-    'entity_id' => $entity_id,
-    'timestamp' => time(),
-    'data' => '',
-  ])->execute();
-//  $redis->set($redis_record_name, (stats_get_count($entity_type, $entity_id) + 1));
-  $redis->incr($redis_record_name);
-}
 
 
 // check if table exists
@@ -124,3 +83,5 @@ if (empty($table_check)) {
 }
 
 $redis = get_redis();
+
+$stats = new Stats($database, $redis);
