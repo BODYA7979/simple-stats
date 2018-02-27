@@ -82,6 +82,4 @@ if (empty($table_check)) {
   create_tables();
 }
 
-$redis = get_redis();
-
-$stats = new Stats($database, $redis);
+$stats = new Stats($database);

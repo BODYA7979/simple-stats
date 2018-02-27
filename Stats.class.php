@@ -6,23 +6,26 @@ class Stats {
 
   /** @var $database Medoo */
   protected $database;
-  /** @var $redis Redis */
-  protected $redis;
 
-  public function __construct($database, $redis)
+  public function __construct($database)
   {
     $this->database = $database;
-    $this->redis = $redis;
+    try {
+      $this->redis = get_redis();
+    }
+    catch (Exception $exception) {
+      exit($exception->getMessage());
+    }
   }
 
   private function getRedisKey($entity_type, $entity_id, $data = []) {
-    $key = 'stats:'.$entity_type.':'.$entity_id;
+    $rediskey = 'stats:'.$entity_type.':'.$entity_id;
     if (!empty($data)) {
       foreach ($data as $key => $value) {
-        $key .= ':'.$key.':'.$value;
+        $rediskey .= ':'.$key.':'.$value;
       }
     }
-    return $key;
+    return $rediskey;
   }
 
   public function write($entity_type, $entity_id, $data = []) {
@@ -81,6 +84,69 @@ class Stats {
       $count = $this->redis->get($redis_record_name);
       return $count;
     }
+  }
+
+  public function topAllTimeByEntityType($entity_type, $limit = 10) {
+    $redis_key_name = $this->getRedisKey($entity_type, null, ['top' => 1, 'all-time' => 1, 'limit' => $limit]);
+    if ($this->redis->exists($redis_key_name)) {
+      $results = @unserialize($this->redis->get($redis_key_name));
+    }
+    else {
+      $query = $this->database->query('select `entity_id`, count(*) as `cnt`
+                                             from `stats`
+                                             WHERE `entity_type` = \''.$entity_type.'\'
+                                             group by `entity_id`
+                                             order by `cnt` desc
+                                             limit '.$limit);
+      if ($query) {
+        $query_results = $query->fetchAll();
+        $results = [];
+        foreach ($query_results as $result) {
+          $results[] = [
+            'entity_id' => $result['entity_id'],
+            'count' => $result['cnt']
+          ];
+        }
+        $this->redis->set($redis_key_name, serialize($results), Config::CACHE_LIFETIME['stats']['top-all-time']);
+      }
+      else {
+        $results = [];
+      }
+    }
+    return $results;
+  }
+
+  public function topEntitiesByEntityTypeAndTimestamp($entity_type, $from, $to, $limit) {
+    $redis_key_name = $this->getRedisKey($entity_type, 0, ['top' => 1, 'from' => $from, 'to' => $to, 'limit' => $limit]);
+    if ($this->redis->exists($redis_key_name)) {
+      $results = @unserialize($this->redis->get($redis_key_name));
+    }
+    else {
+      $sql = 'select `entity_id`, count(*) as `cnt`
+                                             from `stats`
+                                             WHERE `entity_type` = \''.$entity_type.'\' AND `timestamp` >= '.$from.' AND timestamp <= '.$to.'
+                                             group by `entity_id`
+                                             order by `cnt` desc';
+      if ($limit) {
+        $sql .= ' LIMIT '.$limit;
+      };
+      $query = $this->database->query($sql);
+      if ($query) {
+        $query_result = $query->fetchAll();
+        $results = [];
+        foreach ($query_result as $item) {
+          $results[] = [
+            'entity_id' => $item['entity_id'],
+            'count' => $item['cnt']
+          ];
+        }
+        $this->redis->set($redis_key_name, serialize($results), Config::CACHE_LIFETIME['stats']['top-by-timestamp']);
+      }
+      else {
+        $results = [];
+      }
+    }
+    return $results;
   }
 
 }

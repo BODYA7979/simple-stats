@@ -1,8 +1,4 @@
 GET: /stats/get/{entity_type}/{entity_id}
-QUERY PARAMETERS:
-Sort by date: - not required
-from={timestamp_from}
-to={timestamp_to}
 
 Show data count for given parameters
 
